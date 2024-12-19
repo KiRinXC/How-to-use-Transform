@@ -55,3 +55,47 @@ Using a pipeline without specifying a model name and revision in production is n
 ```
 
 > pipeline 会自动选择模型来完成对应任务，如在情感分析中，默认选择微调好的英文情感模型 _distilbert-base-uncased-finetuned-sst-2-english_。
+
+
+#### 2.2 零训练样本分类
+- 指定任务类型为 `zero-shot-classification`，在 `classifier` 中输入待分类文本和候选标签。
+```python
+from transformers import pipeline  
+  
+classifier = pipeline("zero-shot-classification")  
+result = classifier(  
+"This is a course about the Transformers library",  
+candidate_labels=["education", "politics", "business"],  
+)  
+print(result)
+```
+- 使用的模型是 _facebook/bart-large-mnli_
+```txt
+No model was supplied, defaulted to facebook/bart-large-mnli and revision d7645e1 (https://huggingface.co/facebook/bart-large-mnli).
+
+{'sequence': 'This is a course about the Transformers library', 'labels': ['education', 'business', 'politics'], 'scores': [0.8445993065834045, 0.11197393387556076, 0.043426718562841415]}
+```
+
+#### 2.3 文本生成
+- 指定任务类型为 `text-generation` ，也可以指定生成的序列数和生成的最大长度。
+```python
+from transformers import pipeline  
+  
+generator = pipeline("text-generation")  
+results = generator("今日吾虽死，")  
+print(results)  
+results = generator(  
+    "In this course, we will teach you how to",  
+    num_return_sequences=2,  
+    max_length=20  
+)  
+print(results)
+```
+- 使用的模型是 _gpt2_，显然该没有生成中文文本的能力
+```text
+No model was supplied, defaulted to openai-community/gpt2 and revision 607a30d (https://huggingface.co/openai-community/gpt2).
+
+[{'generated_text': '今日吾虽死，我吾處－ ２？\n\n"But I didn\'t mean to mention you or anything, I wanted to tell everybody how my'}]
+[{'generated_text': 'In this course, we will teach you how to understand the role of the law in the U.'}, {'generated_text': 'In this course, we will teach you how to use the power of intuition to understand that time and'}]
+
+```
