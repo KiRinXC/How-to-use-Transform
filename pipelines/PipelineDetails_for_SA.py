@@ -82,3 +82,4 @@ for sample in predict_tolist:
 # 得到标准输出格式
 print(input_list)
 # [{'label': 'POSITIVE', 'score': 0.9598}, {'label': 'POSITIVE', 'score': 0.9999}]
+
