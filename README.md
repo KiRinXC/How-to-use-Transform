@@ -672,9 +672,8 @@ sequence = [
     "Amazing!"]  
   
 inputs = tokenizer(sequence, padding=True,return_tensors="pt")  
-print(inputs)  
-outputs = model(**inputs)  
-print(outputs)
+print(inputs)
+outputs=model(**inputs)
 ```
 - 在分词中，添加了新参数 _padding_ 。因为模型要求输入的张量必须是严格的二维矩形，所以需要将分词后长度不一的token序列填充为统一长度，即每一段文本编码后的 token IDs 数量必须一样多。
 ```txt
@@ -687,17 +686,43 @@ print(outputs)
     [1, 1, 1, 1, 1, 1, 1, 1, 0],
     [1, 1, 1, 1, 0, 0, 0, 0, 0]])
 }
-SequenceClassifierOutput(
-loss=None, 
-logits=tensor([
-	[-2.5780,  2.5856],
-    [-4.3182,  4.7046],
-    [-4.3291,  4.6493]], grad_fn=<AddmmBackward0>), 
-hidden_states=None, 
-attentions=None)
 ```
 
 >这种填充是在[SEP] (token IDs =102)字符之后的，即[CLS]和[SEP]标记的是句子的真实开头与结束。
 
+---
+- 如果进行手动填充呢？使用 `tokenizer.pad.token_id` 获取当前分词器填充的
+```python
+import torch  
+from transformers import AutoTokenizer, AutoModelForSequenceClassification  
+  
+checkpoint = "distilbert-base-uncased-finetuned-sst-2-english"  
+tokenizer = AutoTokenizer.from_pretrained(checkpoint)  
+model = AutoModelForSequenceClassification.from_pretrained(checkpoint)  
+  
+sequence1_ids = [[200, 200, 200]]  
+sequence2_ids = [[200, 200]]  
+batched_ids = [  
+    [200, 200, 200],  
+    [200, 200, tokenizer.pad_token_id],  
+]  
+  
+print(model(torch.tensor(sequence1_ids)).logits)  
+print(model(torch.tensor(sequence2_ids)).logits)  
+print(model(torch.tensor(batched_ids)).logits)
+```
+- 可见当前分词器采用的padding ID是 `0`，且使用 padding token 填充的序列的结果竟然与其单独送入模型时不同！
+```txt
+0
+tensor([[ 1.5694, -1.3895]], grad_fn=<AddmmBackward0>)
+tensor([[ 0.5803, -0.4125]], grad_fn=<AddmmBackward0>)
+tensor([[ 1.5694, -1.3895],
+        [ 1.3374, -1.2163]], grad_fn=<AddmmBackward0>)
+```
+> 因为模型默认会编码输入序列中的所有 token 以建模完整的上下文，即对于手动padding的数据，模型所认为的真正上下文是包含padding在内的。
 
+- 所以，在进行 Padding 操作时，必须明确告知模型哪些 token 是我们填充的，它们不应该参与编码。这就需要使用到 Attention Mask 。
 
+#### 3.2 Attention Mask
+- Attention Mask 是一个尺寸与 input IDs 完全相同，且仅由 0 和 1 组成的张量，0 表示对应位置的 token 是填充符，不参与计算。
+- 借助Attention Mask 就可标出填充的 padding token 的位置，那该如何将Attention Mask传递给model呢？可以回忆一下 ，在[[How  to use Transforms#Padding]]的第一个例子中，传入model的input中包含什么，yej
