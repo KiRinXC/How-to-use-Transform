@@ -1,4 +1,3 @@
-  
 ## 第一章：Transforms快速入门
 ### 1. 安装依赖  
 - 首先安装 `requirements.txt` 中的所有依赖包  
@@ -91,7 +90,7 @@ results = generator(
 )  
 print(results)
 ```
-- 使用的模型是 _gpt2_，显然该没有生成中文文本的能力
+- 使用的模型是 _gpt2_，显然该模型缺少生成中文文本的能力
 ```text
 No model was supplied, defaulted to openai-community/gpt2 and revision 607a30d (https://huggingface.co/openai-community/gpt2).
 
@@ -417,7 +416,7 @@ model = BertModel.from_pretrained("bert-base-cased")
 
 #### 1.1 加载模型
 
-- 所有存储在 [HuggingFace Model Hub](https://huggingface.co/models) 上的模型都可以通过 `Model.from_pretrained()` 来加载权重，参数也可使用本地路径（预先下载的模型目录）
+- 所有存储在 [HuggingFace Model Hub](https://huggingface.co/models) 上的模型都可以通过 `Model.from_pretrained()` 来加载权重，也可使用本地路径（预先下载的模型目录）
 
 ```python
 from transformers import BertModel
@@ -474,7 +473,7 @@ model.save_pretrained('../models/bert-base-cased')
 > 现在广泛采用的是一种同时结合了按词切分和按字符切分的方式——按子词切分 (Subword tokenization)。
 
 - **按子词切分 (Subword)**
-![[Pasted image 20241222210313.png]]
+  ![[Pasted image 20241222210313.png]]
 	- 高频词直接保留，低频词被切分为更有意义的子词。
 
 #### 2.2 加载与保存分词器
@@ -554,24 +553,7 @@ print(sequence_ids)
 [101, 7993, 170, 13809, 23763, 2443, 1110, 3014, 102]
 ```
 
-- 其中 101 和 102 分别是 [CLS] 和 [SEP] 对应的 token IDs。
-
-- **在实际编码文本时，最常见的是直接使用分词器进行处理**
-```python
-from transformers import AutoTokenizer
-
-tokenizer = AutoTokenizer.from_pretrained("bert-base-cased")
-tokenized_text = tokenizer("Using a Transformer network is simple")
-print(tokenized_text)
-```
-- 这样不仅会返回分词后的 token IDs，**还包含模型需要的其他输入**。
-```txt
-{
-	'input_ids': [101, 7993, 170, 13809, 23763, 2443, 1110, 3014, 102], 
-	 'token_type_ids': [0, 0, 0, 0, 0, 0, 0, 0, 0], 
-	 'attention_mask': [1, 1, 1, 1, 1, 1, 1, 1, 1]
-}
-```
+> 其中 101 和 102 分别是 [CLS] 和 [SEP] 对应的 token IDs。
 
 ---
 
@@ -596,6 +578,22 @@ Using a transformer network is simple
 [CLS] Using a Transformer network is simple [SEP]
 ```
 
+- **在实际编码文本时，最常见的是直接使用分词器进行处理**
+```python
+from transformers import AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained("bert-base-cased")
+tokenized_text = tokenizer("Using a Transformer network is simple")
+print(tokenized_text)
+```
+- 这样不仅会返回分词后的 token IDs，**还包含模型需要的其他输入**。
+```txt
+{
+	'input_ids': [101, 7993, 170, 13809, 23763, 2443, 1110, 3014, 102], 
+	 'token_type_ids': [0, 0, 0, 0, 0, 0, 0, 0, 0], 
+	 'attention_mask': [1, 1, 1, 1, 1, 1, 1, 1, 1]
+}
+```
 ### 3. 处理多段文本
 - 在实际任务中，往往会同时处理多段文本，而模型只接收批 (batch) 数据作为输入，即使只有一段文本，也需要将它组成一个只包含一个样本的 batch，例如：
 
@@ -725,4 +723,202 @@ tensor([[ 1.5694, -1.3895],
 
 #### 3.2 Attention Mask
 - Attention Mask 是一个尺寸与 input IDs 完全相同，且仅由 0 和 1 组成的张量，0 表示对应位置的 token 是填充符，不参与计算。
-- 借助Attention Mask 就可标出填充的 padding token 的位置，那该如何将Attention Mask传递给model呢？可以回忆一下 ，在[[How  to use Transforms#Padding]]的第一个例子中，传入model的input中包含什么，yej
+- 借助Attention Mask 就可标出填充的 padding token 的位置，那该如何将Attention Mask传递给model呢？可以回忆一下 ，在[[How  to use Transforms#Padding]]的第一个例子中，传入model的input中包含什么。
+```python 
+sequence1_ids = [[200, 200, 200]]  
+sequence2_ids = [[200, 200]]  
+batched_ids = [  
+    [200, 200, 200],  
+    [200, 200, tokenizer.pad_token_id],  
+]  
+batched_attention_masks = [  
+    [1, 1, 1],  
+    [1, 1, 0],  
+]   
+print(model(torch.tensor(sequence1_ids)).logits)  
+print(model(torch.tensor(sequence2_ids)).logits)
+outputs = model(  
+    torch.tensor(batched_ids),  
+    attention_mask=torch.tensor(batched_attention_masks))  
+print(outputs.logits)
+```
+- 当然可以通过 `attention_mask` 直接将参数传递给 `model`，此时得到的结果就与模型默认编码的结果一致了。
+```txt
+tensor([[ 1.5694, -1.3895]], grad_fn=<AddmmBackward0>)
+tensor([[ 0.5803, -0.4125]], grad_fn=<AddmmBackward0>)
+tensor([[ 1.5694, -1.3895],
+        [ 0.5803, -0.4125]], grad_fn=<AddmmBackward0>)
+```
+
+- 目前大部分 Transformer 模型只能接受长度不超过 512 或 1024 的 token 序列，因此对于长序列，有以下三种处理方法：
+	1. 使用一个支持长文的 Transformer 模型，例如 [Longformer](https://huggingface.co/transformers/model_doc/longformer.html) 和 [LED](https://huggingface.co/transformers/model_doc/led.html)（最大长度 4096）；
+	2. 设定最大长度 `max_sequence_length` 以**截断**输入序列：`sequence = sequence[:max_sequence_length]`。
+	3. 将长文切片为短文本块 (chunk)，然后分别对每一个 chunk 编码。
+
+
+#### 3.3 直接使用分词器
+- 在实际使用中，应该直接使用分词器来完成分词、编码、Padding、构建Attention Mask、截断等操作，下面以 _DistilBERT_ 模型给出一个完整的例子：
+```python
+from transformers import AutoTokenizer  
+  
+checkpoint = "distilbert-base-uncased-finetuned-sst-2-english"  
+tokenizer = AutoTokenizer.from_pretrained(checkpoint)  
+  
+sequences =["How are you?","Nice to meet you!"]  
+  
+model_inputs = tokenizer(sequences,padding=True,truncation=True,return_tensors="pt")  
+print(model_inputs)
+```
+- 分词器会给出模型的需要输入，对于 _DistilBERT_ 模型包含 input_ids 和 attention_mask。
+```
+{'input_ids': tensor([[ 101, 2129, 2024, 2017, 1029,  102,    0],
+        [ 101, 3835, 2000, 3113, 2017,  999,  102]]), 'attention_mask': tensor([[1, 1, 1, 1, 1, 1, 0],
+        [1, 1, 1, 1, 1, 1, 1]])}
+```
+
+- 下面将具体分析 _padding_、_truncation_、_return_tensors_ 三个参数的作用
+---
+**Padding 操作**通过 `padding` 参数来控制：
+- `padding="longest"`/`padding=True`： 将序列填充到当前 batch 中最长序列的长度；
+- `padding="max_length"`：将所有序列填充到模型能够接受的最大长度，例如 BERT 模型就是 512。
+```python
+from transformers import AutoTokenizer  
+  
+checkpoint = "distilbert-base-uncased-finetuned-sst-2-english"  
+tokenizer = AutoTokenizer.from_pretrained(checkpoint)  
+  
+sequences =["How are you?","Nice to meet you!"]  
+  
+model_inputs_1 = tokenizer(sequences,padding="longest")  
+model_inputs_2 = tokenizer(sequences,padding="max_length")  
+print(model_inputs_1)  
+print(model_inputs_2)
+```
+
+```txt
+{'input_ids': [[101, 2129, 2024, 2017, 1029, 102, 0], [101, 3835, 2000, 3113, 2017, 999, 102]], 
+'attention_mask': [[1, 1, 1, 1, 1, 1, 0], [1, 1, 1, 1, 1, 1, 1]]}
+
+{'input_ids': [[101, 2129, 2024, 2017, 1029, 102, 0, 0, 0,...], [101, 3835, 2000, 3113, 2017, 999, 102, 0, 0, 0,...]], 
+'attention_mask': [[1, 1, 1, 1, 1, 1, 0, 0, 0,...], [1, 1, 1, 1, 1, 1, 1, 0, 0, 0,...]]}
+```
+
+---
+**截断操作**通过 `truncation` 参数来控制：
+- `truncation=True`：大于模型最大接受长度的序列都会被截断，例如对于 BERT 模型就会截断长度超过 512 的序列。
+- `max_length` ：手动选择控制截断的长度：
+```python
+from transformers import AutoTokenizer  
+  
+checkpoint = "distilbert-base-uncased-finetuned-sst-2-english"  
+tokenizer = AutoTokenizer.from_pretrained(checkpoint)  
+  
+sequences =["How are you?","Nice to meet you!"]  
+  
+model_inputs = tokenizer(sequences, max_length=4, truncation=True)  
+print(model_inputs)
+```
+
+```txt
+{'input_ids': [[101, 2129, 2024, 102], [101, 3835, 2000, 102]], 'attention_mask': [[1, 1, 1, 1], [1, 1, 1, 1]]}
+```
+---
+**返回张量类型** 通过`return_tensors` 参数指定返回的张量格式：
+-  `pt` ：返回 PyTorch 张量；
+- `tf` ：返回 TensorFlow 张量，
+- `np` ：返回 NumPy 数组。
+```python
+from transformers import AutoTokenizer  
+  
+checkpoint = "distilbert-base-uncased-finetuned-sst-2-english"  
+tokenizer = AutoTokenizer.from_pretrained(checkpoint)  
+  
+sequences =["How are you?","Nice to meet you!"]  
+  
+print(tokenizer(sequences,padding=True, return_tensors="pt"))  
+print(tokenizer(sequences,padding=True, return_tensors="np"))
+```
+在设定返回的张量格式之前，要先进行 padding 或截断操作，将batch中的数据处理成统一的长度，才能够将分词的结果送入模型
+```txt
+{'input_ids': tensor([[ 101, 2129, 2024, 2017, 1029,  102,    0],
+        [ 101, 3835, 2000, 3113, 2017,  999,  102]]), 'attention_mask': tensor([[1, 1, 1, 1, 1, 1, 0],
+        [1, 1, 1, 1, 1, 1, 1]])}
+{'input_ids': array([[ 101, 2129, 2024, 2017, 1029,  102,    0],
+       [ 101, 3835, 2000, 3113, 2017,  999,  102]]), 'attention_mask': array([[1, 1, 1, 1, 1, 1, 0],
+       [1, 1, 1, 1, 1, 1, 1]])}
+```
+
+
+#### 3.4 编码句子对
+- 除了对单段文本进行编码以外（batch 只是并行地编码多个单段文本），对于 BERT 等包含句子对（text pair）预训练任务的模型(类似于问答系统)，它们的分词器也支持对句子对进行编码。
+- 下面例子使用 _bert-base-uncased_ 模型，对比了使用batch对多段文本进行编码和直接编码句子对的区别：
+```python
+from transformers import AutoTokenizer  
+  
+checkpoint = "bert-base-uncased"  
+tokenizer = AutoTokenizer.from_pretrained(checkpoint)  
+  
+sequences = ["Are you Ok?", "I'm OK!"]  
+inputs_direct = tokenizer("Are you Ok?", "I'm OK!")  
+inputs_indirect = tokenizer(sequences)  
+print(inputs_direct)  
+print(inputs_indirect)  
+print(tokenizer.convert_ids_to_tokens(inputs_direct["input_ids"]))
+```
+
+> 在上例中 **Are you Ok?** 和 **I'm OK!** 构成一个句子对
+
+- 通过输出结果可知，句子对的编码思路与单段文本的编码思路并不相同，对于句子对分词器会使用 [SEP] token 拼接两个句子，输出形式为：
+$$
+[CLS] sentence1 [SEP] sentence2 [SEP]
+$$
+```txt
+{'input_ids': [101, 2024, 2017, 7929, 1029, 102, 1045, 1005, 1049, 7929, 999, 102], 'token_type_ids': [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1], 'attention_mask': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]}
+{'input_ids': [[101, 2024, 2017, 7929, 1029, 102], [101, 1045, 1005, 1049, 7929, 999, 102]], 'token_type_ids': [[0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0]], 'attention_mask': [[1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1, 1]]}
+['[CLS]', 'are', 'you', 'ok', '?', '[SEP]', 'i', "'", 'm', 'ok', '!', '[SEP]']
+```
+- 对比 _DistilBERT_ 模型，_bert-base-uncased_ 模型的分词器编码结果中，除了input_ids 和 attention_mask，还多了一个关键词 `token_type_ids` ，用于标记哪些 token 属于第一个句子，哪些属于第二个句子，如果将上面例子中的 `token_type_ids` 项与 token 序列对齐
+```txt
+['[CLS]', 'are', 'you', 'ok', '?', '[SEP]', 'i', "'", 'm', 'ok', '!', '[SEP]']
+[   0   ,   0  ,   0  ,   0 ,  0 ,    0   ,  1 ,  1 ,  1 ,   1 ,  1 ,    1   ]
+```
+- 可见第一个句子 [CLS] sentence1 [SEP] 所有 token 的 type ID 都为 0，而第二个句子sentence2 [SEP]对应的 token type ID 都为 1
+
+> 如果选择其他模型，分词器的输出不一定会包含 `token_type_ids` 项（如 DistilBERT 模型）。分词器只需保证输出格式满足模型所需要的输入格式即可。
+
+-   在实际应用中，可能需要处理大量的句子对，推荐的做法是将它们分别存储在两个数组中。分词器会自动识别这两个数组之间的一一对应关系，并据此构建出相应的句子对。
+```python
+from transformers import AutoTokenizer  
+  
+checkpoint = "bert-base-uncased"  
+tokenizer = AutoTokenizer.from_pretrained(checkpoint)  
+  
+sentence1_list = ["First sentence.", "second sentence.", "Third one.","fourth one."]  
+sentence2_list = ["How are you?", "I am fine,", "thank you,","And you?"]  
+  
+tokens = tokenizer(  
+    sentence1_list,  
+    sentence2_list,  
+    padding=True,  
+    truncation=True,  
+    return_tensors="pt"  
+)  
+print(tokens)  
+print(tokens['input_ids'].shape)
+```
+- 上例中总共有4组句子对，经过编码得到的 `input_ids` 同样也包含四个数组。
+```txt
+{'input_ids': tensor([[ 101, 2034, 6251, 1012,  102, 2129, 2024, 2017, 1029,  102],
+        [ 101, 2117, 6251, 1012,  102, 1045, 2572, 2986, 1010,  102],
+        [ 101, 2353, 2028, 1012,  102, 4067, 2017, 1010,  102,    0],
+        [ 101, 2959, 2028, 1012,  102, 1998, 2017, 1029,  102,    0]]), 'token_type_ids': tensor([[0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
+        [0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
+        [0, 0, 0, 0, 0, 1, 1, 1, 1, 0],
+        [0, 0, 0, 0, 0, 1, 1, 1, 1, 0]]), 'attention_mask': tensor([[1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 0]])}
+torch.Size([4, 10])
+```
+
+> 有趣的是，在`token_type_ids`的处理中，对于`sentence2_list`，分词器将句子对的padding部分视为不属于`sentence2`的一部分，可以说与`attention_mask` 有异曲同工之妙。
